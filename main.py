@@ -4,417 +4,143 @@ import io
 import os
 import json
 import re
-from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
+import PyPDF2
 
 load_dotenv()
-
-from auth import (
-    is_logged_in, get_user_info,
-    get_user_email, show_login_page, load_history, save_to_history
-)
 
 # ─── Page Config ───
 st.set_page_config(
     page_title="AI Resume Critiquer",
     page_icon="📝",
-    layout="centered",
+    layout="wide",
     initial_sidebar_state="expanded",
 )
 
 # ─── Warm Light Theme CSS ───
 st.markdown("""
 <style>
-/* ── Google Font ── */
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;0,9..40,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --bg: #faf8f5;
-    --bg-warm: #fdf6ee;
-    --bg-card: #ffffff;
-    --bg-sidebar: #fef8f1;
-    --accent: #e8734a;
-    --accent-light: #fdeee8;
-    --accent-hover: #d4623c;
-    --accent-gradient: linear-gradient(135deg, #e8734a 0%, #d4623c 100%);
-    --green: #16a34a;
-    --green-light: #f0fdf4;
-    --green-border: #bbf7d0;
-    --red: #dc2626;
-    --red-light: #fef2f2;
-    --red-border: #fecaca;
-    --yellow: #ca8a04;
-    --yellow-light: #fefce8;
-    --yellow-border: #fef08a;
-    --blue: #2563eb;
-    --blue-light: #eff6ff;
-    --blue-border: #bfdbfe;
-    --purple: #7c3aed;
-    --purple-light: #f5f3ff;
-    --purple-border: #ddd6fe;
-    --text: #1f1f1f;
-    --text-secondary: #6b7280;
-    --text-muted: #9ca3af;
-    --border: #f0ece6;
-    --border-dark: #e5e0d8;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.03);
-    --shadow-md: 0 4px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.04);
-    --shadow-lg: 0 8px 30px rgba(0,0,0,0.06);
-    --radius: 16px;
-    --radius-sm: 12px;
-    --radius-xs: 8px;
+    --bg: #D1D5DB;
+    --bg-card: #FFFFFF;
+    --bg-warm: #E5E7EB;
+    --bg-sidebar: #D1D5DB;
+    
+    --accent: #171717;
+    --accent-light: rgba(0, 0, 0, 0.05);
+    --accent-hover: #000000;
+    --accent-gradient: linear-gradient(to right, #18181b, #71717a);
+    
+    --green: #2ecc71;
+    --yellow: #f1c40f;
+    --red: #e74c3c;
+    --blue: #3498db;
+    --purple: #9b59b6;
+    
+    --text: #171717;
+    --text-secondary: #52525B;
+    --text-muted: #71717A;
+    
+    --border: #E4E4E7;
+    --border-dark: #D4D4D8;
 }
 
-/* ── Global ── */
 html, body, .stApp {
-    font-family: 'DM Sans', sans-serif !important;
+    font-family: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif !important;
     color: var(--text) !important;
-}
-.stApp {
     background: var(--bg) !important;
+    letter-spacing: -0.01em;
 }
 
-/* ── Hide Defaults ── */
 #MainMenu, footer, header {visibility: hidden;}
-.stDeployButton {display: none;}
 
-/* ── Scrollbar ── */
-::-webkit-scrollbar {width: 6px;}
-::-webkit-scrollbar-track {background: var(--bg);}
-::-webkit-scrollbar-thumb {background: #d4cfc7; border-radius: 3px;}
-::-webkit-scrollbar-thumb:hover {background: var(--accent);}
+::-webkit-scrollbar {width: 4px; height: 4px;}
+::-webkit-scrollbar-track {background: transparent;}
+::-webkit-scrollbar-thumb {background: #171717; border-radius: 4px;}
 
-/* ── Hero ── */
-.hero {
-    text-align: center;
-    padding: 2.5rem 1rem 1.5rem;
-}
+.hero { text-align: center; padding: 4rem 1rem 3rem; }
 .hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    padding: 0.35rem 1rem;
-    background: var(--accent-light);
-    border-radius: 24px;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--accent);
-    margin-bottom: 1rem;
-    letter-spacing: 0.3px;
+    display: inline-flex; align-items: center; padding: 4px 12px;
+    background: #FFFFFF; border: 2px solid #000000;
+    border-radius: 999px; font-size: 0.75rem; font-weight: 500; color: #171717;
+    margin-bottom: 1.5rem; box-shadow: 2px 2px 0px #000000;
 }
 .hero-title {
-    font-size: 2.6rem;
-    font-weight: 800;
-    color: var(--text);
-    margin-bottom: 0.5rem;
-    letter-spacing: -0.8px;
-    line-height: 1.15;
+    font-size: 3rem; font-weight: 600; color: var(--text);
+    margin-bottom: 1rem; line-height: 1.1; letter-spacing: -0.03em;
 }
 .hero-title span {
-    background: var(--accent-gradient);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
+    background: var(--accent-gradient); -webkit-background-clip: text; -webkit-text-fill-color: transparent;
 }
 .hero-sub {
-    font-size: 1.05rem;
-    color: var(--text-secondary);
-    line-height: 1.65;
-    max-width: 500px;
-    margin: 0 auto;
+    font-size: 1.1rem; color: var(--text-secondary); max-width: 500px;
+    margin: 0 auto; font-weight: 400;
 }
 
-/* ── Card ── */
 .card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 1.5rem;
-    margin-bottom: 1rem;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.3s ease, border-color 0.3s ease;
+    background: var(--bg-card); border: 2px solid #000000; border-radius: 8px;
+    padding: 1.5rem; margin-bottom: 1rem; transition: all 0.2s ease;
+    box-shadow: 4px 4px 0px #000000;
 }
-.card:hover {
-    box-shadow: var(--shadow-md);
-    border-color: var(--border-dark);
-}
+.card:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0px #000000; }
 .card-head {
-    display: flex;
-    align-items: center;
-    gap: 0.65rem;
-    margin-bottom: 0.85rem;
+    display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;
+    padding-bottom: 0.75rem; border-bottom: 2px solid #000000;
 }
-.card-dot {
-    width: 38px;
-    height: 38px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: var(--radius-xs);
-    font-size: 1.05rem;
-    flex-shrink: 0;
-}
-.dot-orange {background: var(--accent-light); color: var(--accent);}
-.dot-green {background: var(--green-light); color: var(--green);}
-.dot-red {background: var(--red-light); color: var(--red);}
-.dot-yellow {background: var(--yellow-light); color: var(--yellow);}
-.dot-blue {background: var(--blue-light); color: var(--blue);}
-.dot-purple {background: var(--purple-light); color: var(--purple);}
-.card-title {
-    font-size: 0.95rem;
-    font-weight: 700;
-    color: var(--text);
-}
-.card-desc {
-    font-size: 0.78rem;
-    color: var(--text-muted);
-    margin-top: 1px;
-}
+.card-title { font-size: 0.95rem; font-weight: 600; color: var(--text); text-transform: uppercase; letter-spacing: 1px; }
+.card-desc { font-size: 0.8rem; color: var(--text-muted); }
 
-/* ── ATS Score ── */
-.score-section {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2.5rem;
-    padding: 1rem 0;
-    flex-wrap: wrap;
-}
-.score-circle {
-    position: relative;
-    width: 150px;
-    height: 150px;
-}
-.score-circle svg {
-    transform: rotate(-90deg);
-}
-.ring-bg {
-    fill: none;
-    stroke: var(--border);
-    stroke-width: 10;
-}
-.ring-fill {
-    fill: none;
-    stroke-width: 10;
-    stroke-linecap: round;
-    stroke-dasharray: 408;
-    transition: stroke-dashoffset 1.5s cubic-bezier(0.4,0,0.2,1);
-}
-.ring-green {stroke: var(--green);}
-.ring-yellow {stroke: var(--yellow);}
-.ring-red {stroke: var(--red);}
-.score-num {
-    position: absolute;
-    top: 50%; left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-}
-.score-big {
-    font-size: 2.6rem;
-    font-weight: 800;
-    line-height: 1;
-}
-.score-big.c-green {color: var(--green);}
-.score-big.c-yellow {color: var(--yellow);}
-.score-big.c-red {color: var(--red);}
-.score-tag {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    margin-top: 4px;
-}
-.score-details {
-    display: flex;
-    flex-direction: column;
-    gap: 0.55rem;
-}
-.score-detail-row {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-    padding: 0.55rem 1rem;
-    background: var(--bg);
-    border-radius: var(--radius-xs);
-    border: 1px solid var(--border);
-    min-width: 200px;
-}
-.score-detail-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    flex-shrink: 0;
-}
-.bg-green {background: var(--green);}
-.bg-yellow {background: var(--yellow);}
-.bg-red {background: var(--red);}
-.score-detail-label {
-    font-size: 0.82rem;
-    color: var(--text-secondary);
-    flex-grow: 1;
-}
-.score-detail-val {
-    font-size: 0.82rem;
-    font-weight: 700;
-}
+.score-section { display: flex; align-items: center; justify-content: center; gap: 3rem; padding: 1rem 0; flex-wrap: wrap; }
+.score-circle { position: relative; width: 140px; height: 140px; }
+.score-circle svg { transform: rotate(-90deg); }
+.ring-bg { fill: none; stroke: var(--border); stroke-width: 6; }
+.ring-fill { fill: none; stroke-width: 6; stroke-linecap: round; stroke-dasharray: 408; transition: stroke-dashoffset 1.5s ease; filter: drop-shadow(0 0 4px currentColor); }
+.ring-green {stroke: var(--green);} .ring-yellow {stroke: var(--yellow);} .ring-red {stroke: var(--red);}
+.score-num { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; }
+.score-big { font-size: 2.5rem; font-weight: 600; line-height: 1; color: var(--text); }
+.score-tag { font-size: 0.65rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; }
+.score-details { display: flex; flex-direction: column; gap: 0.5rem; }
+.score-detail-row { display: flex; align-items: center; gap: 0.75rem; padding: 0.5rem 0.75rem; background: var(--bg-warm); border-radius: 4px; border: 2px solid #000000; min-width: 180px; box-shadow: 2px 2px 0px #000000; }
+.score-detail-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 5px currentColor; }
+.bg-green {background: var(--green); color: var(--green);} .bg-yellow {background: var(--yellow); color: var(--yellow);} .bg-red {background: var(--red); color: var(--red);} .bg-blue {background: var(--accent); color: var(--accent);}
+.score-detail-label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 600; flex-grow: 1; text-transform: uppercase; }
+.score-detail-val { font-size: 0.85rem; font-weight: 600; color: var(--text); }
+.c-green {color: var(--green);} .c-yellow {color: var(--yellow);} .c-red {color: var(--red);} .c-blue {color: var(--blue);}
 
-/* ── Progress Bars ── */
-.bar-wrap {margin-bottom: 0.85rem;}
-.bar-top {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 0.3rem;
-}
-.bar-name {font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);}
-.bar-val {font-size: 0.82rem; font-weight: 700;}
-.bar-track {
-    width: 100%;
-    height: 7px;
-    background: var(--border);
-    border-radius: 4px;
-    overflow: hidden;
-}
-.bar-fill {
-    height: 100%;
-    border-radius: 4px;
-    transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
-}
-.fill-green {background: var(--green);}
-.fill-yellow {background: var(--yellow);}
-.fill-red {background: var(--red);}
+.bar-wrap {margin-bottom: 1rem;} .bar-top { display: flex; justify-content: space-between; margin-bottom: 0.4rem; } 
+.bar-name {font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase;} .bar-val {font-size: 0.85rem; font-weight: 600;} 
+.bar-track { width: 100%; height: 6px; background: rgba(0,0,0,0.1); border-radius: 0px; border: 1px solid #000000; overflow: hidden; } 
+.bar-fill { height: 100%; border-radius: 0px; transition: width 1s ease; }
+.fill-green {background: var(--green); color: var(--green);} .fill-yellow {background: var(--yellow); color: var(--yellow);} .fill-red {background: var(--red); color: var(--red);}
 
-/* ── Item Lists ── */
 .items {list-style: none; padding: 0; margin: 0;}
-.items li {
-    padding: 0.6rem 0.9rem;
-    margin-bottom: 0.4rem;
-    border-radius: var(--radius-xs);
-    font-size: 0.9rem;
-    line-height: 1.6;
-    color: var(--text);
-    display: flex;
-    align-items: flex-start;
-    gap: 0.55rem;
-}
-.items li .li-icon {flex-shrink: 0; margin-top: 2px;}
-.items.s-green li {background: var(--green-light); border: 1px solid var(--green-border);}
-.items.s-red li {background: var(--red-light); border: 1px solid var(--red-border);}
-.items.s-blue li {background: var(--blue-light); border: 1px solid var(--blue-border);}
-.items.s-yellow li {background: var(--yellow-light); border: 1px solid var(--yellow-border);}
+.items li { padding: 0.75rem 1rem; margin-bottom: 0.5rem; border-radius: 4px; font-size: 0.85rem; font-weight: 500; line-height: 1.5; color: var(--text); display: flex; align-items: flex-start; gap: 0.75rem; background: var(--bg-card); border: 2px solid #000000; box-shadow: 2px 2px 0px #000000; }
+.tags {display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;}
+.tag { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; background: #FFFFFF; border: 2px solid #000000; box-shadow: 2px 2px 0px #000000; color: var(--text); }
+.t-found {background: #e6f9ec;}
+.t-miss {background: #fdf5ce;}
 
-/* ── Tags ── */
-.tags {display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.3rem;}
-.tag {
-    display: inline-block;
-    padding: 0.3rem 0.75rem;
-    border-radius: 8px;
-    font-size: 0.8rem;
-    font-weight: 600;
-}
-.t-found {background: var(--green-light); border: 1px solid var(--green-border); color: var(--green);}
-.t-miss {background: var(--yellow-light); border: 1px solid var(--yellow-border); color: var(--yellow);}
+.stButton > button { background: var(--text) !important; color: var(--bg-card) !important; border: 2px solid #000000 !important; border-radius: 4px !important; font-weight: 600 !important; font-family: 'Geist', sans-serif !important; transition: all 0.1s !important; box-shadow: 4px 4px 0px #000000 !important; }
+.stButton > button:hover { transform: translate(2px, 2px) !important; box-shadow: 2px 2px 0px #000000 !important; }
+.stButton > button:active { transform: translate(4px, 4px) !important; box-shadow: 0px 0px 0px #000000 !important; }
 
-/* ── Streamlit Overrides ── */
-.stFileUploader > div {
-    background: var(--bg-card) !important;
-    border: 2px dashed var(--border-dark) !important;
-    border-radius: var(--radius) !important;
-}
-.stFileUploader > div:hover {
-    border-color: var(--accent) !important;
-}
-.stTextInput input {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-dark) !important;
-    border-radius: var(--radius-sm) !important;
-    color: var(--text) !important;
-    font-family: 'DM Sans', sans-serif !important;
-    padding: 0.6rem 0.9rem !important;
-}
-.stTextInput input:focus {
-    border-color: var(--accent) !important;
-    box-shadow: 0 0 0 3px rgba(232,115,74,0.12) !important;
-}
-.stTextInput > div > div {
-    background: transparent !important;
-    border: none !important;
-}
-.stButton > button {
-    background: var(--accent-gradient) !important;
-    color: white !important;
-    border: none !important;
-    border-radius: var(--radius-sm) !important;
-    padding: 0.65rem 2rem !important;
-    font-weight: 700 !important;
-    font-size: 0.92rem !important;
-    font-family: 'DM Sans', sans-serif !important;
-    box-shadow: 0 4px 14px rgba(232,115,74,0.25) !important;
-    transition: transform 0.2s, box-shadow 0.3s !important;
-}
-.stButton > button:hover {
-    transform: translateY(-1px) !important;
-    box-shadow: 0 6px 20px rgba(232,115,74,0.35) !important;
-}
-.stButton > button:active {
-    transform: translateY(0) !important;
-}
-.stSelectbox > div > div {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border-dark) !important;
-    border-radius: var(--radius-sm) !important;
-}
+.stTextInput input, .stSelectbox > div > div { background: var(--bg-card) !important; border: 2px solid #000000 !important; border-radius: 4px !important; color: var(--text) !important; font-family: 'Geist', sans-serif !important; font-weight: 500 !important; box-shadow: 3px 3px 0px #000000 !important; transition: all 0.1s; }
+.stTextInput input:focus, .stSelectbox > div > div:focus { border-color: #000000 !important; box-shadow: 1px 1px 0px #000000 !important; transform: translate(2px, 2px); }
+.stTextInput > div > div { background: transparent !important; border: none !important; }
+.stFileUploader > div { background: var(--bg-card) !important; border: 2px dashed #000000 !important; border-radius: 8px !important; box-shadow: 4px 4px 0px #000000 !important; transition: all 0.1s; }
+.stFileUploader > div:hover { background: #F3F4F6 !important; transform: translate(1px, 1px); box-shadow: 3px 3px 0px #000000 !important; }
 
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] {
-    background: var(--bg-sidebar) !important;
-    border-right: 1px solid var(--border) !important;
-}
-section[data-testid="stSidebar"] .stSelectbox label,
-section[data-testid="stSidebar"] .stMarkdown p {
-    color: var(--text-secondary) !important;
-}
+section[data-testid="stSidebar"] { background: var(--bg-sidebar) !important; border-right: 2px solid #000000 !important; }
+.stDownloadButton > button { background: var(--bg-card) !important; color: var(--text) !important; border: 2px solid #000000 !important; font-weight: 600 !important; border-radius: 4px !important; box-shadow: 3px 3px 0px #000000 !important; }
+.stDownloadButton > button:hover { transform: translate(2px, 2px) !important; box-shadow: 1px 1px 0px #000000 !important; }
+hr { border: none; height: 2px; background: #000000; margin: 2.5rem 0; }
+.streamlit-expanderHeader { background: var(--bg-warm) !important; border: 1px solid var(--border) !important; border-radius: 8px !important; font-weight: 500 !important; }
+.footer { text-align: center; padding: 2rem 0 1rem; color: var(--text-muted); font-size: 0.8rem; }
+.footer a {color: var(--text); text-decoration: none;}
 
-/* ── Download ── */
-.stDownloadButton > button {
-    background: var(--bg) !important;
-    color: var(--text) !important;
-    border: 1px solid var(--border-dark) !important;
-    border-radius: var(--radius-sm) !important;
-    font-weight: 600 !important;
-    box-shadow: none !important;
-}
-.stDownloadButton > button:hover {
-    border-color: var(--accent) !important;
-    color: var(--accent) !important;
-    transform: none !important;
-    box-shadow: none !important;
-}
-
-/* ── Divider ── */
-hr {
-    border: none;
-    height: 1px;
-    background: var(--border);
-    margin: 1.5rem 0;
-}
-
-/* ── Expander ── */
-.streamlit-expanderHeader {
-    background: var(--bg-card) !important;
-    border: 1px solid var(--border) !important;
-    border-radius: var(--radius-sm) !important;
-    font-weight: 600 !important;
-}
-
-/* ── Footer ── */
-.footer {
-    text-align: center;
-    padding: 2.5rem 0 1rem;
-    color: var(--text-muted);
-    font-size: 0.78rem;
-}
-.footer a {color: var(--accent); text-decoration: none;}
-.footer a:hover {text-decoration: underline;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -455,7 +181,7 @@ def grade(score):
 def build_prompt(text, role, mode):
     ctx = f"targeting the role of **{role}**" if role else "for general job applications"
 
-    if mode == "🎯 Full Analysis":
+    if mode == "Full Analysis":
         return f"""You are an elite resume reviewer, ATS expert, and career coach with 15+ years of HR and recruitment experience at top companies like Google, McKinsey, and Amazon.
 
 Perform a DEEP, thorough, SaaS-level analysis of this resume {ctx}. Be specific, cite exact lines from the resume, and give brutally honest feedback. Return ONLY valid JSON — no markdown, no code fences, no extra text.
@@ -506,7 +232,7 @@ Perform a DEEP, thorough, SaaS-level analysis of this resume {ctx}. Be specific,
 Resume:
 {text}"""
 
-    elif mode == "⚡ ATS Optimization":
+    elif mode == "ATS Optimization":
         return f"""You are an ATS (Applicant Tracking System) optimization expert who has worked with Workday, Greenhouse, Lever, and iCIMS systems.
 
 Perform a deep ATS-focused analysis of this resume {ctx}. Be very specific. Return ONLY valid JSON — no markdown, no code fences, no extra text.
@@ -687,57 +413,13 @@ def render_tags(found, missing):
     st.markdown(html, unsafe_allow_html=True)
 
 
-# ─── Authentication Gate ───
-if not is_logged_in():
-    show_login_page()
-
-_ui = get_user_info()
-user_name = _ui.get("name", "User")
-user_email = _ui.get("email", "")
-user_picture = _ui.get("picture", "")
-
-
 # ─── Sidebar ───
 with st.sidebar:
-    _avatar = f'<img src="{user_picture}" style="width:56px;height:56px;border-radius:50%;border:3px solid #f0ece6;" referrerpolicy="no-referrer"/>' if user_picture else '<div style="width:56px;height:56px;border-radius:50%;background:#fdeee8;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:1.5rem;">👤</div>'
-    st.markdown(f"""
-    <div style="text-align:center; padding:1.2rem 0 0.5rem;">
-        {_avatar}
-        <div style="font-size:0.95rem; font-weight:700; color:#1f1f1f; margin-top:0.4rem;">{user_name}</div>
-        <div style="font-size:0.7rem; color:#9ca3af; margin-top:0.1rem;">{user_email}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.markdown("---")
-
     analysis_mode = st.selectbox(
-        "🔍 Analysis Mode",
-        ["🎯 Full Analysis", "⚡ ATS Optimization", "📋 Quick Review"],
+        "Analysis Mode",
+        ["Full Analysis", "ATS Optimization", "Quick Review"],
         help="Choose how deeply you want your resume analyzed."
     )
-
-    st.markdown("---")
-
-    st.markdown('<div style="font-weight:700; font-size:0.88rem; color:#1f1f1f; margin-bottom:0.5rem;">📋 Analysis History</div>', unsafe_allow_html=True)
-    _history = load_history(user_email)
-    if _history:
-        for _h in _history[:8]:
-            _fname = _h.get("file_name", "resume.pdf")
-            _sc = _h.get("ats_score", 0)
-            _role = _h.get("job_role", "General")
-            _ts = _h.get("timestamp", "")
-            _sc_color = "#16a34a" if _sc >= 70 else ("#ca8a04" if _sc >= 50 else "#dc2626")
-            st.markdown(f"""
-            <div style="padding:0.55rem 0.7rem; margin-bottom:0.4rem; background:#fff; border:1px solid #f0ece6; border-radius:10px; font-size:0.78rem;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-weight:600; color:#1f1f1f;">📄 {_fname[:25]}</span>
-                    <span style="font-weight:700; color:{_sc_color};">{_sc}/100</span>
-                </div>
-                <div style="color:#9ca3af; font-size:0.7rem; margin-top:0.2rem;">{_role} · {_ts}</div>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.caption("No analyses yet. Upload a resume to get started!")
 
     st.markdown("---")
 
@@ -753,84 +435,99 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    st.markdown("")
-    if st.button("🚪 Sign Out", use_container_width=True):
-        st.logout("google")
 
 
-# ─── Hero ───
-st.markdown("""
-<div class="hero">
-    <div class="hero-badge">✨ AI-Powered Analysis</div>
-    <div class="hero-title">Resume <span>Critiquer</span></div>
-    <div class="hero-sub">
-        Upload your resume and get instant feedback with ATS scoring 
-        and actionable insights to land your dream job.
-    </div>
-</div>
-""", unsafe_allow_html=True)
-
-
-# ─── Upload ───
-st.markdown("""
-<div class="card">
-    <div class="card-head">
-        <div class="card-dot dot-orange">📄</div>
-        <div>
-            <div class="card-title">Upload Your Resume</div>
-            <div class="card-desc">PDF or TXT · Max 200 MB</div>
+# ─── Process Overview ───
+st.markdown('''
+<div style="padding: 2rem 1rem 1rem; max-width: 900px; margin: 0 auto;">
+    <div style="font-size: 0.85rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2rem; text-align: center;">Process Overview</div>
+    <div style="display: flex; gap: 2rem; justify-content: space-between; align-items: flex-start; text-align: center;">
+        <div style="flex: 1; padding: 1.5rem; background: var(--bg-card); border: 2px solid #000000; border-radius: 8px; box-shadow: 4px 4px 0px #000000; transition: all 0.2s;">
+            <div style="width: 32px; height: 32px; border-radius: 4px; border: 2px solid #000000; background: #000000; color: #FFFFFF; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0 auto 1rem; box-shadow: 2px 2px 0px #000000;">1</div>
+            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text); margin-bottom: 0.5rem; text-transform: uppercase;">Document Intake</div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; font-weight: 500;">Drop your PDF or TXT resume and supply a target role. Data is securely processed.</div>
+        </div>
+        <div style="flex: 1; padding: 1.5rem; background: var(--bg-card); border: 2px solid #000000; border-radius: 8px; box-shadow: 4px 4px 0px #000000; transition: all 0.2s;">
+            <div style="width: 32px; height: 32px; border-radius: 4px; border: 2px solid #000000; background: #FFFFFF; color: #000000; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0 auto 1rem; box-shadow: 2px 2px 0px #000000;">2</div>
+            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text); margin-bottom: 0.5rem; text-transform: uppercase;">Deep AI Audit</div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; font-weight: 500;">Cross-referenced against 30+ precise ATS parameters and industry benchmarks.</div>
+        </div>
+        <div style="flex: 1; padding: 1.5rem; background: var(--bg-card); border: 2px solid #000000; border-radius: 8px; box-shadow: 4px 4px 0px #000000; transition: all 0.2s;">
+            <div style="width: 32px; height: 32px; border-radius: 4px; border: 2px solid #000000; background: #FFFFFF; color: #000000; display: flex; align-items: center; justify-content: center; font-weight: 700; margin: 0 auto 1rem; box-shadow: 2px 2px 0px #000000;">3</div>
+            <div style="font-weight: 700; font-size: 1.05rem; color: var(--text); margin-bottom: 0.5rem; text-transform: uppercase;">Actionable Feedback</div>
+            <div style="color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; font-weight: 500;">Get optimized formatting tips, line-by-line rewrites, and instant technical insight.</div>
         </div>
     </div>
 </div>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
-uploaded_file = st.file_uploader("Upload", type=["pdf", "txt"], label_visibility="collapsed")
+# ─── Hero ───
+st.markdown('''
+<div class="hero" style="padding: 2rem 1rem 3rem;">
+    <div class="hero-title">Elevate Your <span>Career</span></div>
+    <div class="hero-sub" style="margin-top: 1rem;">
+        Upload your resume and get actionable insights, ATS scoring, and targeted feedback to land your next role.
+    </div>
+</div>
+''', unsafe_allow_html=True)
 
-# ─── Job Role Suggestions ───
-JOB_ROLES = [
-    "Python Developer", "Java Developer", "JavaScript Developer", "Full Stack Developer",
-    "Frontend Developer", "Backend Developer", "React Developer", "Angular Developer",
-    "Vue.js Developer", "Node.js Developer", "Django Developer", "Flask Developer",
-    "Software Engineer", "Senior Software Engineer", "Staff Engineer", "Principal Engineer",
-    "Data Scientist", "Data Analyst", "Data Engineer", "Machine Learning Engineer",
-    "AI Engineer", "Deep Learning Engineer", "NLP Engineer", "Computer Vision Engineer",
-    "DevOps Engineer", "SRE Engineer", "Cloud Engineer", "AWS Solutions Architect",
-    "Platform Engineer", "Infrastructure Engineer", "Kubernetes Engineer",
-    "Cybersecurity Analyst", "Security Engineer", "Penetration Tester",
-    "Mobile Developer", "iOS Developer", "Android Developer", "Flutter Developer",
-    "React Native Developer", "QA Engineer", "Test Automation Engineer", "SDET",
-    "Product Manager", "Project Manager", "Scrum Master", "Agile Coach",
-    "Business Analyst", "Systems Analyst", "Solutions Architect", "Technical Architect",
-    "UI/UX Designer", "Product Designer", "Graphic Designer", "Web Designer",
-    "Technical Writer", "Content Writer", "Copywriter",
-    "Marketing Manager", "Digital Marketing Specialist", "SEO Specialist",
-    "Sales Executive", "Account Manager", "Customer Success Manager",
-    "HR Manager", "Recruiter", "Talent Acquisition Specialist",
-    "Finance Analyst", "Accountant", "Investment Analyst",
-    "Operations Manager", "Supply Chain Analyst", "Logistics Coordinator",
-    "Research Scientist", "Biotech Engineer", "Mechanical Engineer",
-    "Electrical Engineer", "Civil Engineer", "Chemical Engineer",
-    "Fresher", "Intern", "Graduate Trainee", "Entry Level",
-]
+# ─── Upload Centered ───
+_, center_col, _ = st.columns([1, 2, 1])
 
-col1, col2 = st.columns([2, 1])
-with col1:
-    job_role = st.text_input(
-        "🎯 Target Job Role (optional)",
-        placeholder="Start typing... e.g. Python Dev..."
-    )
-with col2:
-    st.markdown("<div style='height:1.6rem'></div>", unsafe_allow_html=True)
-    go = st.button("🚀 Analyze Resume", use_container_width=True)
+with center_col:
+    st.markdown('''
+    <div class="card" style="text-align: center; margin-bottom: 1.5rem; border: 1px dashed var(--border-dark);">
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">📄</div>
+        <div style="font-weight: 600; font-size: 1.1rem; color: var(--text);">Upload Your Resume</div>
+        <div style="font-size: 0.9rem; color: var(--text-muted);">PDF or TXT · Max 200 MB</div>
+    </div>
+    ''', unsafe_allow_html=True)
+
+    uploaded_file = st.file_uploader("Upload", type=["pdf", "txt"], label_visibility="collapsed")
+
+    JOB_ROLES = [
+        "Python Developer", "Java Developer", "JavaScript Developer", "Full Stack Developer",
+        "Frontend Developer", "Backend Developer", "React Developer", "Angular Developer",
+        "Vue.js Developer", "Node.js Developer", "Django Developer", "Flask Developer",
+        "Software Engineer", "Senior Software Engineer", "Staff Engineer", "Principal Engineer",
+        "Data Scientist", "Data Analyst", "Data Engineer", "Machine Learning Engineer",
+        "AI Engineer", "Deep Learning Engineer", "NLP Engineer", "Computer Vision Engineer",
+        "DevOps Engineer", "SRE Engineer", "Cloud Engineer", "AWS Solutions Architect",
+        "Platform Engineer", "Infrastructure Engineer", "Kubernetes Engineer",
+        "Cybersecurity Analyst", "Security Engineer", "Penetration Tester",
+        "Mobile Developer", "iOS Developer", "Android Developer", "Flutter Developer",
+        "React Native Developer", "QA Engineer", "Test Automation Engineer", "SDET",
+        "Product Manager", "Project Manager", "Scrum Master", "Agile Coach",
+        "Business Analyst", "Systems Analyst", "Solutions Architect", "Technical Architect",
+        "UI/UX Designer", "Product Designer", "Graphic Designer", "Web Designer",
+        "Technical Writer", "Content Writer", "Copywriter",
+        "Marketing Manager", "Digital Marketing Specialist", "SEO Specialist",
+        "Sales Executive", "Account Manager", "Customer Success Manager",
+        "HR Manager", "Recruiter", "Talent Acquisition Specialist",
+        "Finance Analyst", "Accountant", "Investment Analyst",
+        "Operations Manager", "Supply Chain Analyst", "Logistics Coordinator",
+        "Research Scientist", "Biotech Engineer", "Mechanical Engineer",
+        "Electrical Engineer", "Civil Engineer", "Chemical Engineer",
+        "Fresher", "Intern", "Graduate Trainee", "Entry Level",
+    ]
+
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        job_role = st.text_input(
+            "Target Job Role (optional)",
+            placeholder="Start typing... e.g. Python Dev..."
+        )
+    with col2:
+        st.markdown("<div style='height:1.6rem'></div>", unsafe_allow_html=True)
+        go = st.button("Analyze Resume", use_container_width=True)
 
 # Inject datalist for autocomplete
 _datalist_options = "\n".join([f'<option value="{role}">' for role in JOB_ROLES])
-st.markdown(f"""
+st.markdown(f'''
 <datalist id="jobRoleList">
 {_datalist_options}
 </datalist>
 <script>
-// Attach datalist to the Streamlit text input for autocomplete
 function attachDatalist() {{
     const inputs = document.querySelectorAll('input[type="text"]');
     inputs.forEach(input => {{
@@ -843,15 +540,15 @@ function attachDatalist() {{
         }}
     }});
 }}
-// Run on load and observe for dynamic re-renders
 attachDatalist();
 const observer = new MutationObserver(() => {{ attachDatalist(); }});
 observer.observe(document.body, {{ childList: true, subtree: true }});
 </script>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
 
 # ─── Analysis ───
+
 if go and uploaded_file:
     GROQ_KEY = os.getenv("GROQ_API_KEY")
     OR_KEY = os.getenv("OPENAI_API_KEY")
@@ -865,14 +562,14 @@ if go and uploaded_file:
         st.stop()
 
     try:
-        with st.spinner("📖 Reading your resume..."):
+        with st.spinner("Reading document..."):
             content = extract_text_from_upload(uploaded_file)
 
         if not content.strip():
             st.error("📭 The file appears empty. Please upload a valid resume.")
             st.stop()
 
-        with st.spinner("🧠 Hang on buddy... Analyzing your resume!"):
+        with st.spinner("Analyzing document structure and metrics..."):
             client = OpenAI(api_key=api_key, base_url=base_url)
             prompt = build_prompt(content, job_role, analysis_mode)
 
@@ -902,11 +599,11 @@ if go and uploaded_file:
 
             # Mode Header Badge
             mode_labels = {
-                "🎯 Full Analysis": ("🎯", "Full Analysis Report", "Complete deep-dive into every aspect"),
-                "⚡ ATS Optimization": ("⚡", "ATS Optimization Report", "How ATS systems will parse your resume"),
-                "📋 Quick Review": ("📋", "Quick Review", "Fast overview with key takeaways"),
+                "Full Analysis": ("📈", "Full Analysis Report", "Complete deep-dive into every aspect"),
+                "ATS Optimization": ("⚙️", "ATS Optimization Report", "How ATS systems will parse your resume"),
+                "Quick Review": ("⏱️", "Quick Review", "Fast overview with key takeaways"),
             }
-            m_icon, m_title, m_desc = mode_labels.get(analysis_mode, ("📋", "Report", ""))
+            m_icon, m_title, m_desc = mode_labels.get(analysis_mode, ("", "Report", ""))
             st.markdown(f"""
             <div class="card" style="text-align:center; border-left:4px solid var(--accent);">
                 <div style="font-size:1.5rem; margin-bottom:0.3rem;">{m_icon}</div>
@@ -916,7 +613,7 @@ if go and uploaded_file:
             """, unsafe_allow_html=True)
 
             # ═══ QUICK REVIEW MODE ═══
-            if analysis_mode == "📋 Quick Review":
+            if analysis_mode == "Quick Review":
                 render_score(ats, overall, verdict, g)
                 summary = data.get("summary", "")
                 if summary:
@@ -952,7 +649,7 @@ if go and uploaded_file:
                     st.markdown("</div>", unsafe_allow_html=True)
 
             # ═══ ATS OPTIMIZATION MODE ═══
-            elif analysis_mode == "⚡ ATS Optimization":
+            elif analysis_mode == "ATS Optimization":
                 render_score(ats, overall, verdict, g)
                 summary = data.get("summary", "")
                 if summary:
@@ -1169,17 +866,6 @@ if go and uploaded_file:
                 st.download_button("📥 Download Report", "\n".join(lines),
                                    "resume_analysis_report.txt", "text/plain", use_container_width=True)
 
-            # Save to history
-            save_to_history(user_email, {
-                "timestamp": datetime.now().strftime("%b %d, %Y %I:%M %p"),
-                "file_name": uploaded_file.name,
-                "job_role": job_role or "General",
-                "mode": analysis_mode,
-                "ats_score": ats,
-                "overall_score": overall,
-                "grade": g,
-            })
-
         else:
             st.markdown("""<div class="card"><div class="card-head">
                 <div class="card-dot dot-orange">📋</div>
@@ -1206,7 +892,7 @@ if go and uploaded_file:
             """)
 
 elif go and not uploaded_file:
-    st.warning("📎 Please upload a resume file first!")
+    st.warning("Please upload a resume file first.")
 
 
 # ─── Footer ───
