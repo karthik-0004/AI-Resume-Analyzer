@@ -15,7 +15,7 @@ st.set_page_config(
     page_title="AI Resume Critiquer",
     page_icon="📝",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ─── Warm Light Theme CSS ───
@@ -55,7 +55,7 @@ html, body, .stApp {
     letter-spacing: -0.01em;
 }
 
-#MainMenu, footer, header {visibility: hidden;}
+#MainMenu, footer {visibility: hidden;}
 
 ::-webkit-scrollbar {width: 4px; height: 4px;}
 ::-webkit-scrollbar-track {background: transparent;}
