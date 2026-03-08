@@ -83,7 +83,8 @@ def show_login_page():
 
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        st.button("🔐 Continue with Google", on_click=st.login, args=("google",), use_container_width=True, type="primary")
+        if st.button("🔐 Continue with Google", use_container_width=True, type="primary"):
+            st.login("google")
 
     st.markdown("""
     <div style="max-width:380px; margin:2rem auto; display:flex; flex-direction:column; gap:0.5rem;">
