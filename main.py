@@ -4,10 +4,16 @@ import io
 import os
 import json
 import re
+from datetime import datetime
 from openai import OpenAI
 from dotenv import load_dotenv
 
 load_dotenv()
+
+from auth import (
+    is_logged_in, get_user_info,
+    get_user_email, show_login_page, load_history, save_to_history
+)
 
 # ─── Page Config ───
 st.set_page_config(
@@ -681,15 +687,24 @@ def render_tags(found, missing):
     st.markdown(html, unsafe_allow_html=True)
 
 
+# ─── Authentication Gate ───
+if not is_logged_in():
+    show_login_page()
+
+_ui = get_user_info()
+user_name = _ui.get("name", "User")
+user_email = _ui.get("email", "")
+user_picture = _ui.get("picture", "")
+
+
 # ─── Sidebar ───
 with st.sidebar:
-    st.markdown("""
+    _avatar = f'<img src="{user_picture}" style="width:56px;height:56px;border-radius:50%;border:3px solid #f0ece6;" referrerpolicy="no-referrer"/>' if user_picture else '<div style="width:56px;height:56px;border-radius:50%;background:#fdeee8;display:flex;align-items:center;justify-content:center;margin:0 auto;font-size:1.5rem;">👤</div>'
+    st.markdown(f"""
     <div style="text-align:center; padding:1.2rem 0 0.5rem;">
-        <div style="font-size:2.2rem; margin-bottom:0.3rem;">📝</div>
-        <div style="font-size:1.15rem; font-weight:800; color:#1f1f1f;">
-            Resume Critiquer
-        </div>
-        <div style="font-size:0.72rem; color:#9ca3af; margin-top:0.25rem; font-weight:500;">v2.0 · AI Powered</div>
+        {_avatar}
+        <div style="font-size:0.95rem; font-weight:700; color:#1f1f1f; margin-top:0.4rem;">{user_name}</div>
+        <div style="font-size:0.7rem; color:#9ca3af; margin-top:0.1rem;">{user_email}</div>
     </div>
     """, unsafe_allow_html=True)
 
@@ -700,6 +715,29 @@ with st.sidebar:
         ["🎯 Full Analysis", "⚡ ATS Optimization", "📋 Quick Review"],
         help="Choose how deeply you want your resume analyzed."
     )
+
+    st.markdown("---")
+
+    st.markdown('<div style="font-weight:700; font-size:0.88rem; color:#1f1f1f; margin-bottom:0.5rem;">📋 Analysis History</div>', unsafe_allow_html=True)
+    _history = load_history(user_email)
+    if _history:
+        for _h in _history[:8]:
+            _fname = _h.get("file_name", "resume.pdf")
+            _sc = _h.get("ats_score", 0)
+            _role = _h.get("job_role", "General")
+            _ts = _h.get("timestamp", "")
+            _sc_color = "#16a34a" if _sc >= 70 else ("#ca8a04" if _sc >= 50 else "#dc2626")
+            st.markdown(f"""
+            <div style="padding:0.55rem 0.7rem; margin-bottom:0.4rem; background:#fff; border:1px solid #f0ece6; border-radius:10px; font-size:0.78rem;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600; color:#1f1f1f;">📄 {_fname[:25]}</span>
+                    <span style="font-weight:700; color:{_sc_color};">{_sc}/100</span>
+                </div>
+                <div style="color:#9ca3af; font-size:0.7rem; margin-top:0.2rem;">{_role} · {_ts}</div>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.caption("No analyses yet. Upload a resume to get started!")
 
     st.markdown("---")
 
@@ -716,20 +754,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("")
-
-    st.markdown("""
-    <div style="padding:1rem; background:#fff; border-radius:12px; border:1px solid #f0ece6; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
-        <div style="font-weight:700; font-size:0.88rem; margin-bottom:0.6rem; color:#1f1f1f;">📊 What We Analyze</div>
-        <div style="font-size:0.78rem; color:#6b7280; line-height:1.65;">
-            ✓ ATS compatibility score<br>
-            ✓ Content clarity & impact<br>
-            ✓ Keyword optimization<br>
-            ✓ Skills presentation<br>
-            ✓ Experience quality<br>
-            ✓ Role-specific advice
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    st.button("🚪 Sign Out", on_click=st.logout, use_container_width=True)
 
 
 # ─── Hero ───
@@ -1142,6 +1167,17 @@ if go and uploaded_file:
             with c1:
                 st.download_button("📥 Download Report", "\n".join(lines),
                                    "resume_analysis_report.txt", "text/plain", use_container_width=True)
+
+            # Save to history
+            save_to_history(user_email, {
+                "timestamp": datetime.now().strftime("%b %d, %Y %I:%M %p"),
+                "file_name": uploaded_file.name,
+                "job_role": job_role or "General",
+                "mode": analysis_mode,
+                "ats_score": ats,
+                "overall_score": overall,
+                "grade": g,
+            })
 
         else:
             st.markdown("""<div class="card"><div class="card-head">
