@@ -83,11 +83,11 @@ def show_login_page():
 
     c1, c2, c3 = st.columns([1, 2, 1])
     with c2:
-        login_clicked = st.button("🔐 Continue with Google", use_container_width=True, type="primary")
-        if login_clicked and not st.session_state.get("login_triggered", False):
-            st.session_state["login_triggered"] = True
+        if st.button("🔐 Continue with Google", use_container_width=True, type="primary"):
+            if hasattr(st, "session_state") and st.session_state is not None:
+                st.session_state["login_triggered"] = True
             st.login("google")
-        elif not login_clicked:
+        elif not st.button("🔐 Continue with Google", use_container_width=True, type="primary"):
             st.session_state["login_triggered"] = False
 
     st.markdown("""
