@@ -754,7 +754,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("")
-    st.button("🚪 Sign Out", on_click=st.logout, use_container_width=True)
+    st.button("🚪 Sign Out", on_click=st.logout, args=("google",), use_container_width=True)
 
 
 # ─── Hero ───
